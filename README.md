@@ -1,212 +1,409 @@
-# 🎯 RecognitionSystem - 人脸识别系统
+# 🎯 RecognitionSystem — 人脸识别性能评估系统
 
-基于深度学习的人脸识别系统，支持实时相机识别和开放集识别评估。
+基于深度学习的**实时摄像头人脸识别性能评估系统**，支持：
+- 📷 30 秒摄像头实时人脸检测 + 识别
+- ✍️ 手动标注识别结果
+- 📊 自动生成性能指标（FPS、延迟、准确率）导出 CSV/JSON
+- 🎨 AI 肖像生成（PhotoMaker + SDXL）
+- 🔍 自适应阈值的 Open-set 人脸识别评估
 
 ---
 
-## ✨ 主要功能
+## 📋 目录
 
-### 1. 实时人脸识别 (Web演示)
-- ✅ 基于iResNet50的高精度特征提取
-- ✅ MTCNN人脸检测
-- ✅ 实时相机识别与性能评估
+- [环境要求](#-环境要求)
+- [快速开始](#-快速开始)
+- [项目结构](#-项目结构)
+- [功能说明](#-功能说明)
+- [命令行使用](#-命令行使用)
+- [AI 肖像生成（可选）](#-ai-肖像生成可选)
+- [常见问题](#-常见问题)
+- [论文实验](#-论文实验)
 
-### 2. 自适应开放集识别框架 (论文创新)
-- ✅ Per-Identity自适应阈值
-- ✅ 多层决策机制 (Z-score + 自适应阈值 + 不确定性)
-- ✅ 支持陌生人检测 (Unknown Detection)
+---
+
+## 💻 环境要求
+
+| 项目 | 要求 |
+|------|------|
+| **Python** | 3.10（推荐） |
+| **CUDA** | 12.1+（NVIDIA GPU） |
+| **GPU 显存** | ≥8 GB（AI 肖像功能） |
+| **RAM** | ≥8 GB |
+| **磁盘** | ≥15 GB（含模型权重） |
+| **OS** | Windows 10/11、Linux、macOS |
 
 ---
 
 ## 🚀 快速开始
 
-### Web演示
+### 方式 1：一键安装（推荐）
+
+**Windows：**
+```batch
+setup.bat
+```
+
+**Linux / macOS：**
+```bash
+bash setup.sh
+```
+
+### 方式 2：手动安装
 
 ```bash
+# 1. 创建虚拟环境
+python -m venv venv
+
+# 2. 激活虚拟环境
+# Windows:
+venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
+
+# 3. 安装依赖
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 下载模型权重
+
+```bash
+# 交互式下载工具
+python download_weights.py
+
+# 或创建空数据库
+python download_weights.py --db
+```
+
+⚠️ **模型权重文件**（~167 MB）需要手动下载放到 `weights/` 目录：
+- `weights/model_best.pt` — iResNet50 预训练权重（必需）
+- 获取方式：网盘下载 / 自己训练
+
+### 启动系统
+
+```bash
+# 启动完整 Web 界面
 python run.py
+
+# 或直接启动 Streamlit
+streamlit run apps/recognition_system/streamlit_app.py
+
+# 启动 FastAPI 后端（含 React 前端）
+python run.py api
 ```
 
-### 相机性能评估
+启动后访问：**http://localhost:8501**（Streamlit）
 
-```bash
-bash run_camera_benchmark.sh
+---
+
+## 📁 项目结构
+
+```
+RecognitionSystem/
+├── apps/recognition_system/       # 核心应用代码
+│   ├── core/                      # 核心识别引擎
+│   │   ├── operations.py          # 人脸检测+识别核心逻辑
+│   │   ├── feature_db.py          # SQLite 特征数据库
+│   │   ├── detector.py            # MTCNN 人脸检测器
+│   │   ├── model.py               # iResNet50 识别模型
+│   │   ├── matcher.py             # 特征匹配器
+│   │   ├── tracker.py             # 人脸跟踪
+│   │   ├── adaptive_threshold.py  # 自适应阈值框架 ⭐
+│   │   └── metrics.py             # 性能指标计算
+│   ├── api/                       # FastAPI 后端
+│   ├── auth/                      # JWT 认证
+│   ├── models/                    # ORM 数据模型
+│   ├── repositories/              # 数据访问层
+│   ├── services/                  # 业务逻辑层
+│   │   └── portrait_service.py    # AI 肖像生成服务
+│   ├── ui/                        # Streamlit 前端组件
+│   ├── config.py                  # 系统配置
+│   └── streamlit_app.py           # Streamlit 入口
+│
+├── frontend/                      # React 管理后台
+│   ├── src/                       # React 源码
+│   ├── package.json               # Node.js 依赖
+│   └── vite.config.ts             # Vite 配置
+│
+├── scripts/                       # 实验与评估脚本
+│   ├── extract_casia_features.py  # 从 CASIA-WebFace 提取特征
+│   ├── prepare_open_set_optimized.py  # 准备开放集数据
+│   └── compare_with_prepared_data.py  # 固定 vs 自适应对比
+│
+├── tools/                         # 分析工具集
+│   ├── check_gpu.py               # GPU 检测
+│   ├── check_db.py                # 数据库检查
+│   ├── analyze_threshold_roc.py   # ROC 曲线分析
+│   └── ...                        # 更多工具
+│
+├── weights/                       # 模型权重（需手动下载）
+│   ├── model_best.pt              # iResNet50 (167 MB) ★ 必需
+│   └── hf_cache/                  # HuggingFace 缓存（AI 肖像用，~10 GB）
+│
+├── benchmark/                     # 人脸数据库（需自行创建）
+│   └── YTF_100p.db                # 示例数据库
+│
+├── run.py                         # 应用入口
+├── download_weights.py            # 权重下载工具
+├── requirements.txt               # Python 依赖
+├── setup.bat                      # Windows 一键安装
+├── setup.sh                       # Linux/macOS 一键安装
+└── README.md                      # 本文件
 ```
 
-### 论文实验 (推荐使用CASIA数据集)
+---
+
+## 📖 功能说明
+
+### 1. 实时摄像头识别
+
+通过 Streamlit Web 界面进行实时人脸检测与识别：
 
 ```bash
-# Step 1: 提取CASIA特征 (~30分钟)
+streamlit run apps/recognition_system/streamlit_app.py
+```
+
+功能：
+- 30 秒摄像头采集
+- 实时人脸检测 + 特征提取 + 身份匹配
+- 自动记录性能指标（FPS、延迟）
+- 支持手动标注修正
+- 导出 CSV/JSON 评估报告
+
+### 2. 人脸数据库管理
+
+```bash
+python run.py manager
+```
+
+- 注册新人脸（从图片/摄像头采集）
+- 查看已注册人员列表
+- 删除/更新人脸数据
+
+### 3. 命令行识别
+
+```bash
+# 图片识别
+python run.py recognize-image --image path/to/photo.jpg
+
+# 摄像头实时识别
+python run.py recognize-camera
+```
+
+### 4. Open-set 自适应阈值评估（论文创新点 ⭐）
+
+每个已知身份独立计算阈值，比固定全局阈值更灵活：
+
+```
+τ_i = μ_i - 2σ_i
+
+其中:
+  μ_i = 该身份 genuine 样本的平均相似度
+  σ_i = 该身份 genuine 样本的标准差
+```
+
+---
+
+## ⌨️ 命令行使用
+
+```bash
+python run.py                  # 交互式菜单
+python run.py api              # 启动 FastAPI (http://localhost:8000)
+python run.py full             # 构建 React + 启动 API
+python run.py dev              # API + React 热重载开发模式
+python run.py streamlit        # 启动 Streamlit 界面
+python run.py manager          # 人脸库管理
+python run.py register <目录>  # 批量注册人脸
+python run.py recognize-image <图片>  # 识别单张图片
+python run.py recognize-camera # 摄像头实时识别
+```
+
+---
+
+## 🎨 AI 肖像生成（可选）
+
+使用 PhotoMaker + Stable Diffusion XL 生成不同风格的人像。
+
+### 安装
+
+```bash
+# 1. 安装 PhotoMaker
+pip install git+https://github.com/TencentARC/PhotoMaker.git
+
+# 2. 安装精确版本的依赖
+pip install diffusers==0.29.2 transformers==4.43.0 huggingface_hub==0.36.2
+
+# 3. 下载 SDXL 模型（自动，~10 GB）
+python download_weights.py --hf
+```
+
+### 支持风格
+
+| 风格 | 说明 |
+|------|------|
+| 💼 商务照 | 专业商务形象 |
+| 🪪 证件照 | 标准证件照 |
+| 🏯 古风写真 | 中国古风风格 |
+| 🎭 动漫风格 | 二次元动漫 |
+| 🤖 赛博朋克 | 未来科幻风 |
+| 📸 职业形象照 | 现代职业照 |
+
+### 使用
+
+启动系统后，在 Streamlit 侧边栏选择「AI 肖像生成」→ 选择人员 → 选择风格 → 生成。
+
+⚠️ **要求**：GPU 显存 ≥ 8GB（SDXL fp16 ≈ 6.5GB）
+
+---
+
+## 🔧 配置
+
+编辑 `apps/recognition_system/config.py` 修改系统参数：
+
+```python
+@dataclass(frozen=True)
+class AppConfig:
+    db_path: str = "benchmark/YTF_100p.db"       # 数据库路径
+    weights_path: str = "weights/model_best.pt"   # 模型权重路径
+    model_name: str = "iresnet50"                 # 识别模型
+    detector_backend: str = "mtcnn"               # 检测器（MTCNN / yolo）
+    recognition_threshold: float = 0.45           # 识别阈值
+    detector_conf_threshold: float = 0.60         # 检测置信度
+    device: str = "auto"                          # cuda / cpu / auto
+```
+
+也可以通过环境变量覆盖：
+```bash
+# Windows
+set RECOGNITION_DB_PATH=D:\data\my_faces.db
+# Linux/macOS
+export RECOGNITION_DB_PATH=/data/my_faces.db
+```
+
+---
+
+## 🐛 常见问题
+
+### 1. 启动报错 `FileNotFoundError: model_best.pt`
+
+**原因**：模型权重未下载
+
+**解决**：
+```bash
+python download_weights.py
+# 按提示手动下载 model_best.pt 到 weights/ 目录
+```
+
+### 2. MTCNN 速度太慢（~4 FPS）
+
+**原因**：MTCNN 使用 TensorFlow 后端，CPU 推理较慢
+
+**解决**：
+- 方案 A：降低检测频率，每 2-3 帧处理一次
+- 方案 B：替换为 YOLOv8-Face（5-10 倍提速）
+- 方案 C：使用 GPU 加速 MTCNN
+
+### 3. CUDA Out of Memory
+
+**原因**：GPU 显存不足
+
+**解决**：
+- 使用 CPU 模式：`device = "cpu"` 在 config.py 中
+- 降低 batch size
+- 关闭 AI 肖像生成模块
+
+### 4. `numpy` 版本冲突
+
+**原因**：NumPy 2.x 不兼容
+
+**解决**：
+```bash
+pip install "numpy<2.0"
+```
+
+### 5. AI 肖像生成报错
+
+**原因**：diffusers / transformers / huggingface_hub 版本不匹配
+
+**解决**：使用精确版本
+```bash
+pip install diffusers==0.29.2 transformers==4.43.0 huggingface_hub==0.36.2
+```
+
+---
+
+## 🎓 论文实验
+
+### 开放集识别评估流程
+
+```bash
+# Step 1: 提取 CASIA-WebFace 特征（~30 分钟）
 python scripts/extract_casia_features.py \
-    --dataset-path F:\Dataset\CASIA-WebFace \
+    --dataset-path /path/to/CASIA-WebFace \
     --num-ids 200
 
-# Step 2: 准备开放集数据 (<1分钟)
-python scripts/prepare_open_set_optimized.py --db casia --num-known 100
+# Step 2: 准备开放集数据（<1 分钟）
+python scripts/prepare_open_set_optimized.py \
+    --db casia \
+    --num-known 100
 
-# Step 3: 运行对比评估 (5-10分钟)
+# Step 3: 运行固定 vs 自适应对比评估（5-10 分钟）
 python scripts/compare_with_prepared_data.py
 
 # 查看结果
 cat thesis_eval/fixed_vs_adaptive_results.csv
 ```
 
----
+### 评估指标
 
-## 📊 项目结构
+| 指标 | 含义 | 说明 |
+|------|------|------|
+| **OSR** | Open-Set Recognition Rate | 总体开放集识别率 |
+| **KCA** | Known Class Accuracy | 已知人分类准确率 |
+| **UDR** | Unknown Detection Rate | 陌生人检测率 |
+| **Precision** | — | 拒绝决策精确度 |
+| **F1-Score** | — | 综合性能指标 |
 
-```
-RecognitionSystem/
-├── apps/                    # 核心代码
-│   └── recognition_system/
-│       └── core/            # 核心模块
-├── scripts/                 # 实验脚本
-│   ├── extract_casia_features.py
-│   ├── prepare_open_set_optimized.py
-│   └── compare_with_prepared_data.py
-├── tools/                   # 分析工具
-├── benchmark/               # 数据库
-├── thesis_eval/             # 论文结果
-└── weights/                 # 模型权重
-```
+### 数据库建议
 
-详细说明请查看: [📁 PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+| 场景 | 数据库 | 人数 | 特点 |
+|------|--------|------|------|
+| Web 演示 | YTF_100p.db | 103 | 轻量快速 |
+| 论文实验 | CASIA_200_features.db | 200 | 多样性好 ⭐ 推荐 |
+| 大规模验证 | YTF_allID_50features.db | 1595 | 数据量大 |
 
 ---
 
-## 📈 性能指标
-
-### 开放集识别 (CASIA数据集)
-
-| 指标 | 固定阈值 | 自适应阈值 | 改进 |
-|------|---------|-----------|------|
-| OSR  | ~97%    | ~98%      | +1%  |
-| KCA  | ~95%    | ~96%      | +1%  |
-| UDR  | ~98%    | ~100%     | +2%  |
-
-**注**: 实际结果取决于数据集和参数配置
-
----
-
-## 💡 核心创新
-
-### 自适应阈值框架
-
-**问题**: 固定全局阈值对所有人都一样，不够灵活
-
-**解决方案**:
-```
-为每个已知身份单独计算阈值:
-τ_i = μ_i - 2σ_i
-
-其中:
-- μ_i: 该身份genuine样本的平均相似度
-- σ_i: 该身份genuine样本的标准差
-```
-
-**优势**:
-- ✅ 适应不同身份的特征分布差异
-- ✅ 提高陌生人检测率
-- ✅ 保持已知人识别准确率
-
----
-
-## 🗂️ 数据库
-
-### Web演示用
-- **YTF_100p.db**: 103 persons, 轻量快速
-
-### 论文实验用 (推荐)
-- **CASIA_200_features.db**: 200 persons from CASIA-WebFace
-  - 特点: 人脸多样性强，更真实
-  - 推荐用于论文实验
-
-### 大规模验证用
-- **YTF_allID_50features.db**: 1595 persons, 79750 features
-  - 特点: 数据量大
-  - 适合大规模性能验证
-
----
-
-## 🔧 环境要求
-
-### Python包
-```bash
-pip install torch opencv-python numpy pandas matplotlib
-```
-
-### 硬件
-- GPU: NVIDIA (推荐)
-- RAM: 8GB+
-- 磁盘: 2GB+ (用于数据库和权重)
-
----
-
-## 📝 使用说明
-
-### 选择数据集
-
-**推荐使用CASIA-WebFace**，原因:
-- ✅ 人脸角度/光照/质量多样化
-- ✅ 更接近真实应用场景
-- ✅ 自适应阈值计算更合理
-
-YTF数据集问题:
-- ❌ 同一人的特征来自1-4个视频，高度相似
-- ❌ 导致σ很小，自适应阈值过高
-- ❌ 容易产生false rejection
-
-### 参数调整
+## 📦 导出与分发
 
 ```bash
-# 调整已知/未知比例
-python scripts/prepare_open_set_optimized.py --db casia --num-known 150
+# 创建干净的代码压缩包（不含大文件和临时文件）
+git archive --format=zip --output=RecognitionSystem.zip HEAD
 
-# 调整gallery/test特征数
-python scripts/prepare_open_set_optimized.py --db casia --gallery-size 15 --test-size 15
+# 或使用 .gitignore 自动排除后打包
+zip -r RecognitionSystem.zip . -x "*.pt" "*.pth" "*.db" "node_modules/*"
 ```
 
----
-
-## 🎓 论文应用
-
-本框架作为**论文创新点**使用:
-- 提出自适应开放集识别方法
-- 在多个数据集上验证有效性
-- 与固定阈值基线对比
-
-**注**: 当前Web演示仍使用固定阈值（稳定性考虑）
+分发时附上：
+1. 📦 代码压缩包（本仓库）
+2. 🔗 模型权重下载链接（网盘 / HuggingFace）
+3. 📄 README.md（本文件）
 
 ---
 
-## 📂 关键文件
+## 📝 许可证
 
-| 文件 | 用途 |
-|------|------|
-| `run.py` | Web演示入口 |
-| `camera_benchmark.py` | 相机性能评估 |
-| `scripts/extract_casia_features.py` | 提取CASIA特征 |
-| `scripts/prepare_open_set_optimized.py` | 准备开放集数据 |
-| `scripts/compare_with_prepared_data.py` | 运行对比评估 |
-| `PROJECT_STRUCTURE.md` | 详细项目结构 |
-
----
-
-## 🐛 已知问题与修复
-
-### ✅ 已修复: similarity_con校准函数
-- **问题**: 非线性校准破坏自适应阈值
-- **修复**: 删除校准，直接使用原始cosine相似度
-- **影响**: KCA从75%恢复到96%
+本项目仅用于学术研究和学习目的。
 
 ---
 
 ## 📞 更多信息
 
-详细文档:
-- [项目结构](PROJECT_STRUCTURE.md)
-- [内存文档](.claude/projects/e--RecognitionSystem/memory/MEMORY.md)
+- 项目记忆：[CLAUDE.md](CLAUDE.md)
+- 详细结构：[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+- 后端功能总结：[docs/后端功能总结.md](docs/后端功能总结.md)
 
 ---
 
-**项目状态**: ✅ 核心功能完成
-**最后更新**: 2026-04-03
+**项目状态**：✅ 核心功能完成 | **最后更新**：2026-06

@@ -50,6 +50,8 @@ class FeatureDB:
         )
         self._ensure_column("person", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         self._ensure_column("embedding", "image_path", "TEXT DEFAULT ''")
+        self._ensure_column("person", "gender", "TEXT DEFAULT 'unspecified'")
+        self._ensure_column("person", "birth_date", "TEXT DEFAULT ''")
 
         # Adaptive Open-set Recognition Framework tables
         cur.execute(
@@ -123,13 +125,16 @@ class FeatureDB:
         self.conn.rollback()
         self._in_transaction = False
 
-    def _get_or_create_person_id(self, name: str) -> int:
+    def _get_or_create_person_id(self, name: str, gender: str = "unspecified", birth_date: str = "") -> int:
         cur = self.conn.cursor()
         cur.execute("SELECT id FROM person WHERE name = ?", (name,))
         row = cur.fetchone()
         if row is not None:
             return int(row[0])
-        cur.execute("INSERT INTO person(name) VALUES (?)", (name,))
+        cur.execute(
+            "INSERT INTO person(name, gender, birth_date) VALUES (?, ?, ?)",
+            (name, gender, birth_date),
+        )
         if not self._in_transaction:
             self.conn.commit()
         return int(cur.lastrowid)
@@ -187,8 +192,9 @@ class FeatureDB:
         if not self._in_transaction:
             self.conn.commit()
 
-    def add_embedding(self, name: str, feature: np.ndarray, image_path: str = "") -> None:
-        person_id = self._get_or_create_person_id(name)
+    def add_embedding(self, name: str, feature: np.ndarray, image_path: str = "",
+                      gender: str = "unspecified", birth_date: str = "") -> None:
+        person_id = self._get_or_create_person_id(name, gender=gender, birth_date=birth_date)
         cur = self.conn.cursor()
         cur.execute(
             "INSERT INTO embedding(person_id, feature, image_path) VALUES (?, ?, ?)",
@@ -209,6 +215,38 @@ class FeatureDB:
         rows = cur.fetchall()
         return [(name, _from_blob(blob)) for name, blob in rows]
 
+    def get_person_latest_image_path(self, name: str) -> Optional[str]:
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT e.image_path
+            FROM embedding e
+            JOIN person p ON e.person_id = p.id
+            WHERE p.name = ? AND COALESCE(e.image_path, '') != ''
+            ORDER BY e.id DESC
+            LIMIT 1
+            """,
+            (name,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return str(row[0]) if row[0] else None
+
+    def list_person_image_paths(self, name: str) -> List[str]:
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT e.image_path
+            FROM embedding e
+            JOIN person p ON e.person_id = p.id
+            WHERE p.name = ? AND COALESCE(e.image_path, '') != ''
+            ORDER BY e.id DESC
+            """,
+            (name,),
+        )
+        return [str(row[0]) for row in cur.fetchall() if row and row[0]]
+
     def load_gallery(self, mode: str = "mean") -> List[Tuple[str, np.ndarray]]:
         rows = self.load_all()
         if mode == "all":
@@ -226,18 +264,66 @@ class FeatureDB:
             gallery.append((name, prototype))
         return gallery
 
-    def list_persons(self) -> List[Tuple[str, int]]:
+    def list_persons(self) -> List[Tuple[str, int, str, str]]:
         cur = self.conn.cursor()
         cur.execute(
             """
-            SELECT p.name, COUNT(e.id) AS embedding_count
+            SELECT p.name, COUNT(e.id) AS embedding_count,
+                   COALESCE(p.gender, 'unspecified'), COALESCE(p.birth_date, '')
             FROM person p
             LEFT JOIN embedding e ON e.person_id = p.id
             GROUP BY p.id, p.name
             ORDER BY p.name ASC
             """
         )
-        return [(str(name), int(count)) for name, count in cur.fetchall()]
+        return [(str(name), int(count), str(gender), str(birth_date))
+                for name, count, gender, birth_date in cur.fetchall()]
+
+    def get_person_detail(self, name: str) -> Optional[Tuple[str, int, str, str]]:
+        """Get full person detail by name."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT p.name, COUNT(e.id) AS embedding_count,
+                   COALESCE(p.gender, 'unspecified'), COALESCE(p.birth_date, '')
+            FROM person p
+            LEFT JOIN embedding e ON e.person_id = p.id
+            WHERE p.name = ?
+            GROUP BY p.id, p.name
+            """,
+            (name,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return (str(row[0]), int(row[1]), str(row[2]), str(row[3]))
+
+    def update_person(self, old_name: str, new_name: str = "",
+                      gender: str = "", birth_date: str = "") -> bool:
+        """Update person metadata. Returns True if person was found and updated."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT id, name, gender, birth_date FROM person WHERE name = ?", (old_name,))
+        row = cur.fetchone()
+        if row is None:
+            return False
+
+        person_id = int(row[0])
+        final_name = new_name if new_name else str(row[1])
+        final_gender = gender if gender else str(row[2] or "unspecified")
+        final_birth_date = birth_date if birth_date else str(row[3] or "")
+
+        if new_name and new_name != old_name:
+            cur.execute("SELECT id FROM person WHERE name = ?", (new_name,))
+            if cur.fetchone() is not None:
+                raise ValueError(f"Person '{new_name}' already exists!")
+
+        cur.execute(
+            "UPDATE person SET name = ?, gender = ?, birth_date = ? WHERE id = ?",
+            (final_name, final_gender, final_birth_date, person_id),
+        )
+        if not self._in_transaction:
+            self.conn.commit()
+        return True
 
     def get_stats(self) -> Dict[str, int]:
         cur = self.conn.cursor()

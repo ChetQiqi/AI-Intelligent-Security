@@ -6,6 +6,10 @@ __pycache__/
 *.pyo
 *.pyd
 *.so
+*.egg-info/
+*.egg
+dist/
+build/
 .venv/
 venv/
 env/
@@ -18,6 +22,21 @@ pip-wheel-metadata/
 .idea/
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
+
+# =========================
+# Claude AI (local dev only)
+# =========================
+.claude/
+CLAUDE.md
+AI_gen.md
+
+# =========================
+# Streamlit
+# =========================
+.streamlit/
 
 # =========================
 # Logs / temp
@@ -33,12 +52,9 @@ temp/
 camera_eval/
 video_eval/
 threshold_analysis/
-
-# Evaluation results
-# Matches directories like evaluation_results_casia200, evaluation_results_YTF_full, etc.
+ai_portraits/
+generated_portraits/
 evaluation_results_*/
-
-# Thesis eval generated artifacts (keep docs/table sources)
 thesis_eval/*.csv
 thesis_eval/*.json
 thesis_eval/*.png
@@ -46,17 +62,30 @@ thesis_eval/*.png
 !thesis_eval/*.tex
 
 # =========================
-# Open-set / benchmark generated data
+# Model weights (too large for git)
+# =========================
+weights/*.pt
+weights/*.pth
+weights/*.onnx
+weights/hf_cache/
+weights/managed/
+
+# =========================
+# Benchmark data (face images & databases)
 # =========================
 benchmark/
-# benchmark/open_set_data/
-# benchmark/open_set_data_*/
-# benchmark/train/
-# benchmark/test/
 
-# Uncomment if you do NOT want to upload experiment databases
-# benchmark/*.db
-# *.db
+# =========================
+# Frontend (Node.js)
+# =========================
+frontend/node_modules/
+frontend/dist/
+
+# =========================
+# Personal files (DO NOT distribute)
+# =========================
+docs/简历_*
+郭齐祺_个人简历.pdf
 
 # =========================
 # Large artifacts
@@ -65,7 +94,9 @@ benchmark/
 *.npy
 *.npz
 
-# Model weights (usually large)
-weights/*.pt
-weights/*.pth
-weights/*.onnx
+# =========================
+# Stray / temp files
+# =========================
+=0.27.0
+*.bak
+*.tmp

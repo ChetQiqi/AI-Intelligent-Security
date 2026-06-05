@@ -270,20 +270,76 @@ def recognize_faces(
     return results
 
 
+def _draw_label_pill(img: np.ndarray, text: str, x: int, y: int, color, font_scale: float = 0.5):
+    """在框上方绘制胶囊形标签（深色背景 + 白色文字）。"""
+    thickness = max(1, int(font_scale * 2.5))
+    (tw, th), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+    pad = int(th * 0.55)
+    rx, ry = max(0, x), max(0, y - th - pad * 2)
+    rw, rh = tw + pad * 2, th + pad * 2
+    # 深色半透明背景
+    cv2.rectangle(img, (rx, ry), (rx + rw, ry + rh), (20, 20, 30), -1)
+    cv2.rectangle(img, (rx, ry), (rx + rw, ry + rh), color, 1)
+    # 白色文字
+    cv2.putText(img, text, (rx + pad, ry + th + pad),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+
+
+def _draw_corner_brackets(img: np.ndarray, x1: int, y1: int, x2: int, y2: int, color, thickness: int):
+    """绘制四角 L 形括号（现代风格识别框）。"""
+    bw, bh = x2 - x1, y2 - y1
+    corner = int(min(bw, bh) * 0.22)
+    # 左上
+    cv2.line(img, (x1, y1), (x1 + corner, y1), color, thickness)
+    cv2.line(img, (x1, y1), (x1, y1 + corner), color, thickness)
+    # 右上
+    cv2.line(img, (x2, y1), (x2 - corner, y1), color, thickness)
+    cv2.line(img, (x2, y1), (x2, y1 + corner), color, thickness)
+    # 左下
+    cv2.line(img, (x1, y2), (x1 + corner, y2), color, thickness)
+    cv2.line(img, (x1, y2), (x1, y2 - corner), color, thickness)
+    # 右下
+    cv2.line(img, (x2, y2), (x2 - corner, y2), color, thickness)
+    cv2.line(img, (x2, y2), (x2, y2 - corner), color, thickness)
+
+
 def draw_recognitions(frame: np.ndarray, results) -> np.ndarray:
+    """在帧上绘制现代风格的人脸识别结果。
+
+    使用四角括号 + 半透明填充 + 胶囊标签替代传统粗矩形框。
+    """
     annotated = frame.copy()
+    overlay = annotated.copy()
+    h_img, w_img = annotated.shape[:2]
+    line_thickness = max(2, min(4, min(h_img, w_img) // 300))
+
     for item in results:
         x, y, w, h = item["box"]
-        # 认识的人=绿色，陌生人=红色（更醒目）
-        color = (30, 180, 30) if item["accepted"] else (0, 0, 255)
-        cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
-        cv2.putText(
-            annotated,
-            item["label"],
-            (x, max(25, y - 8)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            color,
-            2,
-        )
+        x2, y2 = x + w, y + h
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(annotated.shape[1], x2)
+        y2 = min(annotated.shape[0], y2)
+
+        if item["accepted"]:
+            color = (100, 230, 140)  # 柔和翠绿
+            fill_color = (45, 100, 65)
+        else:
+            color = (100, 100, 240)  # 柔和红紫
+            fill_color = (80, 35, 50)
+
+        # 半透明填充（先画在 overlay 上，稍后混合）
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), fill_color, -1)
+
+        # 四角括号
+        _draw_corner_brackets(annotated, x1, y1, x2, y2, color, line_thickness)
+
+        # 胶囊标签
+        label = item.get("label", "")
+        if label:
+            _draw_label_pill(annotated, label, x1, y1 - 4, color)
+
+    # 混合半透明填充
+    cv2.addWeighted(overlay, 0.12, annotated, 0.88, 0, annotated)
+
     return annotated
