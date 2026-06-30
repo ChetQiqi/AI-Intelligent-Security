@@ -49,18 +49,27 @@ def build_react() -> bool:
 
 
 def start_api():
-    """启动 FastAPI（含 React 前端）。"""
+    """启动识别 API、事件中心 API 和 React 前端。"""
     print("\n" + "=" * 60)
-    print("  OpenSet Face Recognition — API Server")
+    print("  OpenSet Face Recognition + Security Event Center")
     print("=" * 60)
     print(f"\n  Web UI:  http://127.0.0.1:8000")
-    print(f"  API 文档: http://127.0.0.1:8000/docs")
+    print(f"  识别 API 文档: http://127.0.0.1:8000/docs")
+    print(f"  事件 API 文档: http://127.0.0.1:8001/docs")
     print(f"  按 Ctrl+C 停止\n")
-    subprocess.run([
+    event_proc = subprocess.Popen([
         sys.executable, "-m", "uvicorn",
-        "apps.recognition_system.api.main:app",
-        "--host", "127.0.0.1", "--port", "8000",
+        "app.main:app",
+        "--host", "127.0.0.1", "--port", "8001",
     ])
+    try:
+        subprocess.run([
+            sys.executable, "-m", "uvicorn",
+            "apps.recognition_system.api.main:app",
+            "--host", "127.0.0.1", "--port", "8000",
+        ])
+    finally:
+        event_proc.terminate()
 
 
 def start_react_dev():
@@ -105,11 +114,17 @@ def main():
                 "apps.recognition_system.api.main:app",
                 "--host", "127.0.0.1", "--port", "8000",
             ])
+            event_proc = subprocess.Popen([
+                sys.executable, "-m", "uvicorn",
+                "app.main:app",
+                "--host", "127.0.0.1", "--port", "8001",
+            ])
             try:
                 time.sleep(2)
                 start_react_dev()
             finally:
                 api_proc.terminate()
+                event_proc.terminate()
         elif command == "build":
             build_react()
         elif command == "react-dev":
@@ -161,11 +176,17 @@ def main():
                     "apps.recognition_system.api.main:app",
                     "--host", "127.0.0.1", "--port", "8000",
                 ])
+                event_proc = subprocess.Popen([
+                    sys.executable, "-m", "uvicorn",
+                    "app.main:app",
+                    "--host", "127.0.0.1", "--port", "8001",
+                ])
                 try:
                     time.sleep(2)
                     start_react_dev()
                 finally:
                     api_proc.terminate()
+                    event_proc.terminate()
             elif choice == "4":
                 build_react()
             elif choice == "5":

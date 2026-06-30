@@ -33,9 +33,12 @@ fastapi>=0.100.0                   # REST API 框架
 uvicorn>=0.20.0                    # ASGI 服务器
 python-multipart>=0.0.6            # 文件上传支持
 requests>=2.28.0                   # HTTP 客户端
+pypdf>=4.0.0                       # RAG PDF 文档解析
+python-docx>=1.1.0                 # RAG DOCX 文档解析
 
 # ---------------------- 数据库 & 认证 ----------------------
 sqlalchemy>=2.0.0                  # ORM
+pgvector>=0.2.5                    # PostgreSQL pgvector 向量扩展支持
 passlib[bcrypt]>=1.7.4             # 密码哈希
 python-jose[cryptography]>=3.3.0   # JWT 编解码
 

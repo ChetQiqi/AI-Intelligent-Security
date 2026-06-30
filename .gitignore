@@ -13,6 +13,7 @@ build/
 .venv/
 venv/
 env/
+.env
 pip-wheel-metadata/
 
 # =========================
@@ -90,3 +91,6 @@ thesis_eval/
 *.bak
 *.tmp
 *.zip
+
+# Isolated feature worktrees
+.worktrees/

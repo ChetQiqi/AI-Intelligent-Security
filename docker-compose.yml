@@ -1,0 +1,40 @@
+services:
+  event-db:
+    image: postgres:16-alpine
+    container_name: recognition-event-db
+    environment:
+      POSTGRES_DB: security_events
+      POSTGRES_USER: event
+      POSTGRES_PASSWORD: event_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - event-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U event -d security_events"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  event-test-db:
+    image: postgres:16-alpine
+    container_name: recognition-event-test-db
+    environment:
+      POSTGRES_DB: security_events_test
+      POSTGRES_USER: event_test
+      POSTGRES_PASSWORD: event_test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - event-test-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U event_test -d security_events_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  event-db-data:
+  event-test-db-data:
